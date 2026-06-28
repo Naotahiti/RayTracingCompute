@@ -1,0 +1,22 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "x64\\Debug\\glm.obj",
+            "outputs": [
+                "x64\\Debug\\glm.cppm.ifc.dt.module.json",
+                "x64\\Debug\\glm.cppm.ifc.dt.d.json",
+                "x64\\Debug\\glm.ifc"
+            ],
+            "provides": [
+                {
+                    "logical-name": "glm",
+                    "source-path": "c:\\users\\hinen\\desktop\\lib and tools\\glm-master\\glm\\glm.cppm",
+                    "is-interface": true
+                }
+            ],
+            "requires": []
+        }
+    ]
+}

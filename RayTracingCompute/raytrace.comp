@@ -1,0 +1,99 @@
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+// Sortie : un buffer de pixels (RGBA8 packé en uint, ou RGBA en float ici pour simplicité)
+layout(set = 0, binding = 0, std430) buffer OutputBuffer {
+    vec4 pixels[];
+};
+
+// Paramètres de la caméra, envoyés depuis le C++ (équivalent camera::initialize())
+layout(set = 0, binding = 1) uniform CameraParams {
+    vec3 center;          // padding auto std140/std430 : vec3 aligné sur 16 octets
+    float _pad0;
+    vec3 pixel00_loc;
+    float _pad1;
+    vec3 pixel_delta_u;
+    float _pad2;
+    vec3 pixel_delta_v;
+    float _pad3;
+    int  image_width;
+    int  image_height;
+    int  samples_per_pixel;
+    int  _pad4;
+};
+
+struct Ray {
+    vec3 origin;
+    vec3 direction;
+};
+
+vec3 ray_at(Ray r, float t) {
+    return r.origin + t * r.direction;
+}
+
+bool hit_sphere(vec3 center, float radius, Ray r, out float t) {
+    vec3 oc = center - r.origin;
+    float a = dot(r.direction, r.direction);
+    float h = dot(r.direction, oc);
+    float c = dot(oc, oc) - radius * radius;
+    float discriminant = h * h - a * c;
+
+    if (discriminant < 0.0) return false;
+    t = (h - sqrt(discriminant)) / a;
+    return t > 0.001; // évite les intersections "derrière" la caméra
+}
+
+vec3 ray_color(Ray r) {
+    float t;
+    if (hit_sphere(vec3(0, 0, -1), 0.5, r, t)) {
+        vec3 N = normalize(ray_at(r, t) - vec3(0, 0, -1));
+        return 0.5 * (N + vec3(1.0));
+    }
+    vec3 unit_dir = normalize(r.direction);
+    float a = 0.5 * (unit_dir.y + 1.0);
+    return (1.0 - a) * vec3(1.0) + a * vec3(0.5, 0.7, 1.0);
+}
+
+// PRNG GPU-friendly (équivalent random_double() de rtweekend.h)
+uint rngState;
+
+uint pcg_hash() {
+    rngState = rngState * 747796405u + 2891336453u;
+    uint result = ((rngState >> ((rngState >> 28u) + 4u)) ^ rngState) * 277803737u;
+    return (result >> 22u) ^ result;
+}
+
+float random_double() {
+    return float(pcg_hash()) / 4294967295.0;
+}
+
+void main() {
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (pixel.x >= image_width || pixel.y >= image_height) return;
+
+    // Seed différent par pixel, sinon tous les threads tirent la même séquence
+    rngState = uint(pixel.x) * 1973u + uint(pixel.y) * 9277u + 1u;
+
+    vec3 pixelColor = vec3(0.0);
+
+    for (int s = 0; s < samples_per_pixel; s++) {
+        float offsetX = random_double() - 0.5;
+        float offsetY = random_double() - 0.5;
+
+        vec3 pixelSample = pixel00_loc
+            + (float(pixel.x) + offsetX) * pixel_delta_u
+            + (float(pixel.y) + offsetY) * pixel_delta_v;
+
+        Ray r;
+        r.origin = center;
+        r.direction = pixelSample - center;
+
+        pixelColor += ray_color(r);
+    }
+
+    pixelColor /= float(samples_per_pixel);
+
+    int index = pixel.y * image_width + pixel.x;
+    pixels[index] = vec4(pixelColor, 1.0);
+}

@@ -13,5 +13,95 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="ressources">
+      <UniqueIdentifier>{ba346c82-5288-486c-b567-99b9ace06a65}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ressources\glm">
+      <UniqueIdentifier>{41b0c731-41ed-4596-a701-cce8976ec1e2}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\lib and tools\glm-master\glm\glm.cppm">
+      <Filter>ressources\glm</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>Fichiers sources</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\lib and tools\glm-master\glm\mat3x4.hpp">
+      <Filter>ressources\glm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\lib and tools\glm-master\glm\mat4x2.hpp">
+      <Filter>ressources\glm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\lib and tools\glm-master\glm\mat4x3.hpp">
+      <Filter>ressources\glm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\lib and tools\glm-master\glm\mat4x4.hpp">
+      <Filter>ressources\glm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\lib and tools\glm-master\glm\matrix.hpp">
+      <Filter>ressources\glm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\lib and tools\glm-master\glm\packing.hpp">
+      <Filter>ressources\glm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\lib and tools\glm-master\glm\trigonometric.hpp">
+      <Filter>ressources\glm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\lib and tools\glm-master\glm\vec2.hpp">
+      <Filter>ressources\glm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\lib and tools\glm-master\glm\vec3.hpp">
+      <Filter>ressources\glm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\lib and tools\glm-master\glm\vec4.hpp">
+      <Filter>ressources\glm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\lib and tools\glm-master\glm\vector_relational.hpp">
+      <Filter>ressources\glm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\lib and tools\glm-master\glm\common.hpp">
+      <Filter>ressources\glm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\lib and tools\glm-master\glm\exponential.hpp">
+      <Filter>ressources\glm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\lib and tools\glm-master\glm\ext.hpp">
+      <Filter>ressources\glm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\lib and tools\glm-master\glm\fwd.hpp">
+      <Filter>ressources\glm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\lib and tools\glm-master\glm\geometric.hpp">
+      <Filter>ressources\glm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\lib and tools\glm-master\glm\glm.hpp">
+      <Filter>ressources\glm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\lib and tools\glm-master\glm\integer.hpp">
+      <Filter>ressources\glm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\lib and tools\glm-master\glm\mat2x2.hpp">
+      <Filter>ressources\glm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\lib and tools\glm-master\glm\mat2x3.hpp">
+      <Filter>ressources\glm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\lib and tools\glm-master\glm\mat2x4.hpp">
+      <Filter>ressources\glm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\lib and tools\glm-master\glm\mat3x2.hpp">
+      <Filter>ressources\glm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\lib and tools\glm-master\glm\mat3x3.hpp">
+      <Filter>ressources\glm</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="raytrace.comp">
+      <Filter>Fichiers sources</Filter>
+    </None>
   </ItemGroup>
 </Project>

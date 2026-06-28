@@ -3,5 +3,5 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="RayTracingCompute/RayTracingCompute.vcxproj" />
+  <Project Path="RayTracingCompute/RayTracingCompute.vcxproj" Id="57137fd0-eff8-47d0-9f43-aa34ac3ba33c" />
 </Solution>
