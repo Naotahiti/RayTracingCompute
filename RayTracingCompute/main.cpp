@@ -1,14 +1,3 @@
-// main.cpp — Ray Tracing in One Weekend, version "compute" avec Vulkan
-//
-// Prérequis projet (Visual Studio) :
-//   - Vulkan SDK : include dirs + lib dirs + vulkan-1.lib en lien
-//   - GLM        : header-only, juste ajouter le dossier include
-//   - GLFW       : non utilisé ici (pas de fenêtre, calcul "offline")
-//
-// AVANT DE COMPILER CE .cpp :
-//   Compiler le shader avec glslc (fourni par le Vulkan SDK) :
-//     glslc raytrace.comp -o raytrace.spv
-//   Placer raytrace.spv dans le même dossier que l'exécutable.
 
 #include "vulkan/vulkan.h"
 #include "glm/glm.hpp"
@@ -19,24 +8,18 @@
 #include <stdexcept>
 #include <cstring>
 
-// ---------------------------------------------------------------------------
-// Structure envoyée au shader (doit matcher EXACTEMENT le layout std430/std140
-// de "CameraParams" dans raytrace.comp, padding inclus)
-// ---------------------------------------------------------------------------
+
 struct CameraParamsGPU {
     glm::vec3 center;          float _pad0;
     glm::vec3 pixel00_loc;     float _pad1;
     glm::vec3 pixel_delta_u;   float _pad2;
     glm::vec3 pixel_delta_v;   float _pad3;
-    int       image_width = 400;
-    int       image_height = 400;
-    int       samples_per_pixel = 10;
+    int       image_width;
+    int       image_height;
+    int       samples_per_pixel;
     int       _pad4;
 };
 
-// ---------------------------------------------------------------------------
-// Petite classe utilitaire pour ne pas répéter le code Vulkan partout
-// ---------------------------------------------------------------------------
 class VulkanCompute {
 public:
     void run(int image_width, int image_height, int samples_per_pixel) {
@@ -123,7 +106,7 @@ private:
 
         std::vector<VkPhysicalDevice> devices(count);
         vkEnumeratePhysicalDevices(instance, &count, devices.data());
-        physicalDevice = devices[0]; // simplification : on prend le premier GPU trouvé
+        physicalDevice = devices[0]; 
 
         VkPhysicalDeviceProperties props;
         vkGetPhysicalDeviceProperties(physicalDevice, &props);
