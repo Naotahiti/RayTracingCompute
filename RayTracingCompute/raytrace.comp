@@ -2,27 +2,63 @@
 
 layout(local_size_x = 8, local_size_y = 8) in;
 
-// Sortie : un buffer de pixels (RGBA8 packé en uint, ou RGBA en float ici pour simplicité)
+// ============================================================================
+// BUFFERS / UNIFORMS — la "communication" avec main.cpp se fait via ces bindings
+// ============================================================================
+
+// binding 0 : l'image de sortie (un vec4 par pixel)
 layout(set = 0, binding = 0, std430) buffer OutputBuffer {
     vec4 pixels[];
 };
 
-// Paramètres de la caméra, envoyés depuis le C++ (équivalent camera::initialize())
-layout(set = 0, binding = 1) uniform CameraParams {
-    vec3 center;          // padding auto std140/std430 : vec3 aligné sur 16 octets
-    float _pad0;
-    vec3 pixel00_loc;
-    float _pad1;
-    vec3 pixel_delta_u;
-    float _pad2;
-    vec3 pixel_delta_v;
-    float _pad3;
-    int  image_width;
-    int  image_height;
-    int  samples_per_pixel;
-    int  _pad4;
+// binding 1 : paramètres de la caméra (équivalent camera::initialize() + champs publics)
+layout(set = 0, binding = 1, std140) uniform CameraParams {
+    vec3  center;            float _pad0;
+    vec3  pixel00_loc;       float _pad1;
+    vec3  pixel_delta_u;     float _pad2;
+    vec3  pixel_delta_v;     float _pad3;
+    vec3  u;                 float _pad4;   // base de la caméra (right)
+    vec3  v;                 float _pad5;   // base de la caméra (up)
+    vec3  w;                 float _pad6;   // base de la caméra (back, -direction de visée)
+    vec3  defocus_disk_u;    float _pad7;
+    vec3  defocus_disk_v;    float _pad8;
+    int   image_width;
+    int   image_height;
+    int   samples_per_pixel;
+    int   max_depth;
+    float defocus_angle;
+    int   sphere_count;
+    int   _pad9;
+    int   _pad10;
 };
 
+// binding 2 : liste des sphères de la scène (équivalent hittable_list rempli de sphere)
+struct Sphere {
+    vec3  center;
+    float radius;
+    int   materialIndex;
+    float _pad0, _pad1, _pad2; // alignement std430 (vec3 = 16 octets)
+};
+
+layout(set = 0, binding = 2, std430) readonly buffer SphereBuffer {
+    Sphere spheres[];
+};
+
+struct Material {
+    vec3  albedo;
+    float fuzz;
+    float refraction_index;
+    int   type;          // 0 = lambertian, 1 = metal, 2 = dielectric
+    float _pad0, _pad1;  // alignement std430 (taille totale multiple de 16)
+};
+
+layout(set = 0, binding = 3, std430) readonly buffer MaterialBuffer {
+    Material materials[];
+};
+
+// ============================================================================
+// RAY — équivalent de ray.h
+// ============================================================================
 struct Ray {
     vec3 origin;
     vec3 direction;
@@ -32,30 +68,68 @@ vec3 ray_at(Ray r, float t) {
     return r.origin + t * r.direction;
 }
 
-bool hit_sphere(vec3 center, float radius, Ray r, out float t) {
-    vec3 oc = center - r.origin;
+// ============================================================================
+// HIT RECORD — équivalent de hittable.h (struct hit_record)
+// ============================================================================
+struct HitRecord {
+    vec3  p;
+    vec3  normal;
+    float t;
+    bool  front_face;
+    int   materialIndex;
+};
+
+void set_face_normal(inout HitRecord rec, Ray r, vec3 outward_normal) {
+    rec.front_face = dot(r.direction, outward_normal) < 0.0;
+    rec.normal = rec.front_face ? outward_normal : -outward_normal;
+}
+
+// ============================================================================
+// SPHERE INTERSECTION — équivalent de sphere::hit()
+// ============================================================================
+bool hit_sphere(Sphere s, Ray r, float tMin, float tMax, out HitRecord rec) {
+    vec3 oc = s.center - r.origin;
     float a = dot(r.direction, r.direction);
     float h = dot(r.direction, oc);
-    float c = dot(oc, oc) - radius * radius;
+    float c = dot(oc, oc) - s.radius * s.radius;
     float discriminant = h * h - a * c;
 
     if (discriminant < 0.0) return false;
-    t = (h - sqrt(discriminant)) / a;
-    return t > 0.001; // évite les intersections "derrière" la caméra
-}
+    float sqrtd = sqrt(discriminant);
 
-vec3 ray_color(Ray r) {
-    float t;
-    if (hit_sphere(vec3(0, 0, -1), 0.5, r, t)) {
-        vec3 N = normalize(ray_at(r, t) - vec3(0, 0, -1));
-        return 0.5 * (N + vec3(1.0));
+    float root = (h - sqrtd) / a;
+    if (root <= tMin || root >= tMax) {
+        root = (h + sqrtd) / a;
+        if (root <= tMin || root >= tMax) return false;
     }
-    vec3 unit_dir = normalize(r.direction);
-    float a = 0.5 * (unit_dir.y + 1.0);
-    return (1.0 - a) * vec3(1.0) + a * vec3(0.5, 0.7, 1.0);
+
+    rec.t = root;
+    rec.p = ray_at(r, rec.t);
+    vec3 outward_normal = (rec.p - s.center) / s.radius;
+    set_face_normal(rec, r, outward_normal);
+    rec.materialIndex = s.materialIndex;
+    return true;
 }
 
-// PRNG GPU-friendly (équivalent random_double() de rtweekend.h)
+// équivalent de hittable_list::hit() — teste toutes les sphères, garde la plus proche
+bool hit_world(Ray r, float tMin, float tMax, out HitRecord rec) {
+    HitRecord temp;
+    bool hitAnything = false;
+    float closest = tMax;
+
+    for (int i = 0; i < sphere_count; i++) {
+        if (hit_sphere(spheres[i], r, tMin, closest, temp)) {
+            hitAnything = true;
+            closest = temp.t;
+            rec = temp;
+        }
+    }
+    return hitAnything;
+}
+
+// ============================================================================
+// PRNG — équivalent de random_double() dans rtweekend.h
+// ============================================================================
 uint rngState;
 
 uint pcg_hash() {
@@ -68,27 +142,184 @@ float random_double() {
     return float(pcg_hash()) / 4294967295.0;
 }
 
+float random_double(float minV, float maxV) {
+    return minV + (maxV - minV) * random_double();
+}
+
+vec3 random_vec3() {
+    return vec3(random_double(), random_double(), random_double());
+}
+
+vec3 random_vec3(float minV, float maxV) {
+    return vec3(random_double(minV, maxV), random_double(minV, maxV), random_double(minV, maxV));
+}
+
+// équivalent random_unit_vector() de vec3.h (méthode du rejet dans un cube)
+vec3 random_unit_vector() {
+    for (int i = 0; i < 100; i++) {
+        vec3 p = random_vec3(-1.0, 1.0);
+        float lensq = dot(p, p);
+        if (1e-20 < lensq && lensq <= 1.0)
+            return p / sqrt(lensq);
+    }
+    return vec3(0, 0, 1);
+}
+
+// équivalent random_in_unit_disk() de vec3.h (même méthode, en 2D)
+vec3 random_in_unit_disk() {
+    for (int i = 0; i < 100; i++) {
+        vec3 p = vec3(random_double(-1.0, 1.0), random_double(-1.0, 1.0), 0.0);
+        if (dot(p, p) < 1.0) return p;
+    }
+    return vec3(0, 0, 0);
+}
+
+bool near_zero(vec3 v) {
+    float s = 1e-8;
+    return (abs(v.x) < s) && (abs(v.y) < s) && (abs(v.z) < s);
+}
+
+// ============================================================================
+// MATERIAL — équivalent de material.h (lambertian / metal / dielectric)
+// ============================================================================
+float reflectance(float cosine, float refraction_index) {
+    float r0 = (1.0 - refraction_index) / (1.0 + refraction_index);
+    r0 = r0 * r0;
+    return r0 + (1.0 - r0) * pow((1.0 - cosine), 5.0);
+}
+
+// refract maison : la convention de signe diffère du refract() natif GLSL
+vec3 refract_custom(vec3 uv, vec3 n, float etai_over_etat) {
+    float cos_theta = min(dot(-uv, n), 1.0);
+    vec3 r_out_perp = etai_over_etat * (uv + cos_theta * n);
+    vec3 r_out_parallel = -sqrt(abs(1.0 - dot(r_out_perp, r_out_perp))) * n;
+    return r_out_perp + r_out_parallel;
+}
+
+bool scatter(Material mat, Ray r_in, HitRecord rec, out vec3 attenuation, out Ray scattered) {
+
+    if (mat.type == 0) {
+        // --- Lambertian ---
+        vec3 scatter_direction = rec.normal + random_unit_vector();
+        if (near_zero(scatter_direction))
+            scatter_direction = rec.normal;
+
+        scattered.origin = rec.p;
+        scattered.direction = scatter_direction;
+        attenuation = mat.albedo;
+        return true;
+    }
+    else if (mat.type == 1) {
+        // --- Metal ---
+        vec3 reflected = reflect(r_in.direction, rec.normal);
+        reflected = normalize(reflected) + (mat.fuzz * random_unit_vector());
+
+        scattered.origin = rec.p;
+        scattered.direction = reflected;
+        attenuation = mat.albedo;
+        return dot(scattered.direction, rec.normal) > 0.0;
+    }
+    else if (mat.type == 2) {
+        // --- Dielectric ---
+        attenuation = vec3(1.0);
+        float ri = rec.front_face ? (1.0 / mat.refraction_index) : mat.refraction_index;
+
+        vec3 unit_direction = normalize(r_in.direction);
+        float cos_theta = min(dot(-unit_direction, rec.normal), 1.0);
+        float sin_theta = sqrt(1.0 - cos_theta * cos_theta);
+
+        bool cannot_refract = ri * sin_theta > 1.0;
+        vec3 direction;
+
+        if (cannot_refract || reflectance(cos_theta, ri) > random_double())
+            direction = reflect(unit_direction, rec.normal);
+        else
+            direction = refract_custom(unit_direction, rec.normal, ri);
+
+        scattered.origin = rec.p;
+        scattered.direction = direction;
+        return true;
+    }
+
+    attenuation = vec3(0.0);
+    return false;
+}
+
+// ============================================================================
+// CAMERA — équivalent de camera.h (get_ray, sample_square, defocus_disk_sample)
+// ============================================================================
+vec3 sample_square() {
+    return vec3(random_double() - 0.5, random_double() - 0.5, 0.0);
+}
+
+vec3 defocus_disk_sample() {
+    vec3 p = random_in_unit_disk();
+    return center + (p.x * defocus_disk_u) + (p.y * defocus_disk_v);
+}
+
+Ray get_ray(int i, int j) {
+    vec3 offset = sample_square();
+    vec3 pixel_sample = pixel00_loc
+        + ((float(i) + offset.x) * pixel_delta_u)
+        + ((float(j) + offset.y) * pixel_delta_v);
+
+    vec3 ray_origin = (defocus_angle <= 0.0) ? center : defocus_disk_sample();
+    vec3 ray_direction = pixel_sample - ray_origin;
+
+    Ray r;
+    r.origin = ray_origin;
+    r.direction = ray_direction;
+    return r;
+}
+
+// ============================================================================
+// RAY_COLOR — équivalent de camera::ray_color() (récursion -> boucle)
+// ============================================================================
+vec3 ray_color(Ray r) {
+    vec3 currentColor = vec3(1.0);
+    Ray currentRay = r;
+
+    for (int depth = 0; depth < max_depth; depth++) {
+        HitRecord rec;
+
+        if (hit_world(currentRay, 0.001, 1e30, rec)) {
+            Material mat = materials[rec.materialIndex];
+            vec3 attenuation;
+            Ray scattered;
+
+            if (scatter(mat, currentRay, rec, attenuation, scattered)) {
+                currentColor *= attenuation;
+                currentRay = scattered;
+                continue;
+            }
+            return vec3(0.0); // le matériau absorbe tout (cas "return false" du tuto)
+        }
+
+        // Rien touché : fond de ciel (dégradé bleu/blanc)
+        vec3 unit_direction = normalize(currentRay.direction);
+        float a = 0.5 * (unit_direction.y + 1.0);
+        vec3 background = (1.0 - a) * vec3(1.0) + a * vec3(0.5, 0.7, 1.0);
+        return currentColor * background;
+    }
+
+    // max_depth atteint sans toucher le ciel : plus aucune lumière collectée
+    return vec3(0.0);
+}
+
+// ============================================================================
+// MAIN — équivalent de la double boucle for(j) for(i) dans camera::render()
+// ============================================================================
 void main() {
     ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
     if (pixel.x >= image_width || pixel.y >= image_height) return;
 
-    // Seed différent par pixel, sinon tous les threads tirent la même séquence
+    // Seed différent par pixel (sinon tous les threads tirent la même séquence)
     rngState = uint(pixel.x) * 1973u + uint(pixel.y) * 9277u + 1u;
 
     vec3 pixelColor = vec3(0.0);
 
     for (int s = 0; s < samples_per_pixel; s++) {
-        float offsetX = random_double() - 0.5;
-        float offsetY = random_double() - 0.5;
-
-        vec3 pixelSample = pixel00_loc
-            + (float(pixel.x) + offsetX) * pixel_delta_u
-            + (float(pixel.y) + offsetY) * pixel_delta_v;
-
-        Ray r;
-        r.origin = center;
-        r.direction = pixelSample - center;
-
+        Ray r = get_ray(pixel.x, pixel.y);
         pixelColor += ray_color(r);
     }
 
